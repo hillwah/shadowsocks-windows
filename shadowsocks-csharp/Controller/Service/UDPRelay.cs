@@ -74,17 +74,19 @@ namespace Shadowsocks.Controller
             }
             public void Send(byte[] data, int length)
             {
-                IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password, _server.one_time_auth, true);
+                IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password, _server.auth, true);
                 byte[] dataIn = new byte[length - 3 + IVEncryptor.ONETIMEAUTH_BYTES];
                 Array.Copy(data, 3, dataIn, 0, length - 3);
                 byte[] dataOut = new byte[length - 3 + 16 + IVEncryptor.ONETIMEAUTH_BYTES];
                 int outlen;
                 encryptor.Encrypt(dataIn, length - 3, dataOut, out outlen);
+                Logging.Debug($"++++++Send Server Port, size:" + outlen);
                 _remote.SendTo(dataOut, outlen, SocketFlags.None, _remoteEndPoint);
             }
             public void Receive()
             {
                 EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                Logging.Debug($"++++++Receive Server Port, size:" + _buffer.Length);
                 _remote.BeginReceiveFrom(_buffer, 0, _buffer.Length, 0, ref remoteEndPoint, new AsyncCallback(RecvFromCallback), null);
             }
             public void RecvFromCallback(IAsyncResult ar)
@@ -97,12 +99,13 @@ namespace Shadowsocks.Controller
                     byte[] dataOut = new byte[bytesRead];
                     int outlen;
 
-                    IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password, _server.one_time_auth, true);
+                    IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password, _server.auth, true);
                     encryptor.Decrypt(_buffer, bytesRead, dataOut, out outlen);
 
                     byte[] sendBuf = new byte[outlen + 3];
                     Array.Copy(dataOut, 0, sendBuf, 3, outlen);
 
+                    Logging.Debug($"======Send Local Port, size:" + (outlen + 3));
                     _local.SendTo(sendBuf, outlen + 3, 0, _localEndPoint);
                     Receive();
                 }
